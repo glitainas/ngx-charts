@@ -210,6 +210,7 @@ export class LineChartComponent extends BaseChartComponent implements OnInit {
   @Input() xAxisLabel: string;
   @Input() yAxisLabel: string;
   @Input() autoScale: boolean;
+  @Input() autoZoom;
   @Input() timeline: boolean;
   @Input() gradient: boolean;
   @Input() showGridLines: boolean = true;
@@ -268,6 +269,7 @@ export class LineChartComponent extends BaseChartComponent implements OnInit {
   timelineXScale: any;
   timelineYScale: any;
   timelineXDomain: any;
+  timelineYDomain: any;
   timelineTransform: any;
   timelinePadding: number = 10;
 
@@ -299,6 +301,9 @@ export class LineChartComponent extends BaseChartComponent implements OnInit {
 
     if (this.timeline) {
       this.dims.height -= this.timelineHeight + this.margin[2] + this.timelinePadding;
+      // timeline needs to be updated before getYDomain(true)
+      // because it may use `timelineYDomain` updated value
+      this.updateTimeline();
     }
 
     this.xDomain = this.getXDomain();
@@ -306,13 +311,14 @@ export class LineChartComponent extends BaseChartComponent implements OnInit {
       this.xDomain = this.filteredDomain;
     }
 
-    this.yDomain = this.getYDomain();
+    // this.yDomain = this.getYDomain();
+    this.yDomain = this.getYDomain(this.autoZoom);
     this.seriesDomain = this.getSeriesDomain();
 
     this.xScale = this.getXScale(this.xDomain, this.dims.width);
     this.yScale = this.getYScale(this.yDomain, this.dims.height);
 
-    this.updateTimeline();
+    //this.updateTimeline();
 
     this.setColors();
     this.legendOptions = this.getLegendOptions();
@@ -327,8 +333,10 @@ export class LineChartComponent extends BaseChartComponent implements OnInit {
     if (this.timeline) {
       this.timelineWidth = this.dims.width;
       this.timelineXDomain = this.getXDomain();
+      this.timelineYDomain = this.getYDomain();
       this.timelineXScale = this.getXScale(this.timelineXDomain, this.timelineWidth);
-      this.timelineYScale = this.getYScale(this.yDomain, this.timelineHeight);
+      // this.timelineYScale = this.getYScale(this.yDomain, this.timelineHeight);
+      this.timelineYScale = this.getYScale(this.timelineYDomain, this.timelineHeight);
       this.timelineTransform = `translate(${this.dims.xOffset}, ${-this.margin[2]})`;
     }
   }
@@ -372,11 +380,13 @@ export class LineChartComponent extends BaseChartComponent implements OnInit {
     return domain;
   }
 
-  getYDomain(): [number, number] {
+  // getYDomain(): [number, number] {
+  getYDomain(zoom: boolean = false): [number, number] {
     const domain = [];
     for (const results of this.results) {
       for (const d of results.series) {
-        if (domain.indexOf(d.value) < 0) {
+        // if (domain.indexOf(d.value) < 0) {
+        if ((!zoom || this.isInXDomain(d.name)) && domain.indexOf(d.value) < 0) {
           domain.push(d.value);
         }
         if (d.min !== undefined) {
@@ -392,6 +402,12 @@ export class LineChartComponent extends BaseChartComponent implements OnInit {
           }
         }
       }
+    }
+
+    if (zoom && domain.length < 2) {
+      // when there are no points in currently selected X-range
+      // fallback to a full co-domain
+      return this.timelineYDomain;
     }
 
     const values = [...domain];
@@ -438,6 +454,8 @@ export class LineChartComponent extends BaseChartComponent implements OnInit {
     this.filteredDomain = domain;
     this.xDomain = this.filteredDomain;
     this.xScale = this.getXScale(this.xDomain, this.dims.width);
+    this.yDomain = this.getYDomain(this.autoZoom);
+    this.yScale = this.getYScale(this.yDomain, this.dims.height);
   }
 
   updateHoveredVertical(item): void {
@@ -530,5 +548,13 @@ export class LineChartComponent extends BaseChartComponent implements OnInit {
       this.deactivate.emit({ value: entry, entries: [] });
     }
     this.activeEntries = [];
+  }
+  
+  private isInXDomain(name: any) {
+    if (this.scaleType === 'linear' || this.scaleType === 'time') {
+      return name > this.xDomain[0] && name < this.xDomain[1];
+    } else {
+      return this.xDomain.indexOf(name) >= 0;
+    }
   }
 }
