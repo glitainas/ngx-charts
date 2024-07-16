@@ -1,6 +1,6 @@
 {
   "name": "@glitainas/ngx-charts",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Declarative Charting Framework for Angular",
   "author": "George Litainas",
   "repository": {
